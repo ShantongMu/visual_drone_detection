@@ -1,0 +1,7 @@
+path: /home/mst/桌面/mst/rt_detr/datasets/DUT-Anti-UAV-YOLO
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: UAV
