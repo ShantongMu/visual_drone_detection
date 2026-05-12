@@ -2,7 +2,7 @@
 import os
 import argparse
 import cv2
-from ultralytics import RTDETR
+from ultralytics import YOLO
 from pathlib import Path
 
 
@@ -18,12 +18,14 @@ def parse_args():
                         help='Confidence threshold')
     parser.add_argument('--iou', type=float, default=0.45,
                         help='IoU threshold for NMS')
-    parser.add_argument('--imgsz', type=int, default=640,
-                        help='Image size')
+    parser.add_argument('--imgsz', type=int, default=1280,
+                        help='Image size (1280 recommended for small drone targets)')
     parser.add_argument('--device', type=str, default='0',
                         help='Device (0 for GPU, cpu for CPU)')
     parser.add_argument('--save', action='store_true', default=True,
-                        help='Save results')
+                        help='Save results (default: True)')
+    parser.add_argument('--no-save', action='store_false', dest='save',
+                        help='Do NOT save results (overrides default)')
     parser.add_argument('--show', action='store_true',
                         help='Show results (not recommended for headless environments)')
     
@@ -49,7 +51,7 @@ def main():
         return
     
     print(f"Loading model from {args.model}...")
-    model = RTDETR(args.model)
+    model = YOLO(args.model)
     
     os.makedirs(args.output, exist_ok=True)
     

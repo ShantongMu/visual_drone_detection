@@ -10,6 +10,18 @@ weights/
 # Results
 results/
 runs/
+compare_results/
+
+# Images and media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.pdf
+*.csv
+*.json
 
 # Python
 __pycache__/
@@ -46,3 +58,4 @@ Thumbs.db
 
 # Logs
 *.log
+issue_log*.txt

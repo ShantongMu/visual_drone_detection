@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-from ultralytics import RTDETR
+from ultralytics import YOLO
 
 
 def parse_args():
@@ -11,8 +11,8 @@ def parse_args():
                         help='Path to dataset config file')
     parser.add_argument('--batch', type=int, default=8,
                         help='Batch size')
-    parser.add_argument('--imgsz', type=int, default=640,
-                        help='Image size')
+    parser.add_argument('--imgsz', type=int, default=1280,
+                        help='Image size (1280 recommended for small drone targets)')
     parser.add_argument('--device', type=str, default='0',
                         help='Device (0 for GPU, cpu for CPU)')
     parser.add_argument('--split', type=str, default='val',
@@ -34,7 +34,7 @@ def main():
     print()
     
     print(f"Loading model from {args.model}...")
-    model = RTDETR(args.model)
+    model = YOLO(args.model)
     
     metrics = model.val(
         data=args.data,

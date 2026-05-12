@@ -17,18 +17,42 @@ rt_detr/
 ├── weights/               # 权重文件目录
 ├── results/               # 结果目录
 ├── train.py               # 训练脚本
+├── train_safe.py          # 显存安全训练脚本（推荐）
 ├── val.py                 # 验证脚本
 ├── inference.py           # 推理脚本
-└── requirements.txt       # 依赖包列表
+├── memory_safe_trainer.py # 显存安全训练器
+├── requirements.txt       # 依赖包列表
+├── README.md              # 项目说明
+├── ENV_SETUP.md           # 虚拟环境使用指南
+└── MEMORY_OPTIMIZATION_GUIDE.md  # 显存优化指南
 ```
 
 ## 环境配置
 
-### 1. 安装依赖
+### 1. 虚拟环境
 
+本项目已配置 conda 虚拟环境 `mu`，包含所有必要的依赖：
+
+| 依赖包 | 版本 | 说明 |
+|--------|------|------|
+| Python | 3.10.20 | 编程语言 |
+| PyTorch | 2.2.0+cu121 | 深度学习框架 (CUDA 12.1) |
+| Ultralytics | 8.4.48 | YOLO/RT-DETR 实现库 |
+| OpenCV | 4.9.0 | 计算机视觉库 |
+| NumPy | 1.26.4 | 数值计算 |
+| Matplotlib | 3.8.4 | 可视化库 |
+
+**激活虚拟环境：**
 ```bash
-pip install -r requirements.txt
+conda activate mu
 ```
+
+**查看环境配置：**
+```bash
+conda list | grep -E "(python|torch|ultralytics|opencv)"
+```
+
+详细配置请参见 [ENV_SETUP.md](./ENV_SETUP.md)。
 
 ### 2. 数据集准备
 
@@ -40,8 +64,23 @@ pip install -r requirements.txt
 python scripts/download_dut_anti_uav.py
 ```
 
-将下载的数据集解压到 `datasets/DUT-Anti-UAV/` 目录，确保目录结构如下：
+将下载的数据集解压到 `datasets/` 或 `datasets/DUT-Anti-UAV/` 目录。转换脚本支持多种目录结构，自动检测：
 
+**结构 1（推荐）：**
+```
+datasets/
+├── train/
+│   ├── img/
+│   └── xml/
+├── val/
+│   ├── img/
+│   └── xml/
+└── test/
+    ├── img/
+    └── xml/
+```
+
+**结构 2（根据 DUT-Anti-UAV 原始结构）：**
 ```
 datasets/DUT-Anti-UAV/
 ├── train/
@@ -69,25 +108,91 @@ python scripts/convert_to_yolo.py
 
 ### 训练
 
+#### 显存安全训练（推荐）
+使用自动显存管理的训练脚本，避免显存溢出：
 ```bash
-python train.py --model rtdetr-l.pt --epochs 100 --batch 8 --imgsz 640
+python train_safe.py --model rtdetr-l.pt --epochs 100 --batch 16 --imgsz 1280
+```
+
+#### 普通训练
+```bash
+python train.py --model rtdetr-l.pt --epochs 100 --batch 8 --imgsz 1280
+```
+
+#### 后台运行训练（推荐用于长时间训练）
+
+**方法一：使用 nohup（通用方式）**
+```bash
+cd /home/apulis-dev/code/rt_detr
+nohup python train.py --model rtdetr-l.pt --epochs 100 --batch 8 --imgsz 1280 > training.log 2>&1 &
+```
+
+**方法二：使用 conda run（确保在正确环境运行）**
+```bash
+cd /home/apulis-dev/code/rt_detr
+nohup /opt/conda/private/envs/mu/bin/python train.py --model rtdetr-l.pt --epochs 100 --batch 8 --imgsz 1280 > training.log 2>&1 &
+```
+
+**查看训练进度：**
+```bash
+tail -f training.log
+```
+
+**停止训练：**
+```bash
+# 查找训练进程
+ps aux | grep train.py
+# 终止进程（替换 <PID> 为实际进程号）
+kill <PID>
+# 强制终止（如果正常终止不起作用）
+kill -9 <PID>
 ```
 
 常用参数：
 - `--model`: RT-DETR 模型大小 (rtdetr-n.pt, rtdetr-s.pt, rtdetr-m.pt, rtdetr-l.pt, rtdetr-x.pt)
 - `--data`: 数据集配置文件路径
 - `--epochs`: 训练轮数
-- `--batch`: 批次大小
-- `--imgsz`: 输入图像尺寸
+- `--batch`: 批次大小 (根据显存调整)
+- `--imgsz`: 输入图像尺寸 (**1280 推荐用于小目标无人机**，可选 1024 或更大)
 - `--device`: 训练设备 (0 表示 GPU，cpu 表示 CPU)
 - `--project`: 项目目录
 - `--name`: 实验名称
+
+> **重要提示：对于无人机这类小目标，建议使用 1280 或更大的 imgsz。较小的尺寸 (如 640) 会导致下采样后特征丢失。**
+>
+> **显存优化：** 如果遇到显存溢出问题，请使用 `train_safe.py` 或参考 [MEMORY_OPTIMIZATION_GUIDE.md](./MEMORY_OPTIMIZATION_GUIDE.md)。
 
 ### 验证
 
 ```bash
 python val.py --model results/rtdetr_drone/weights/best.pt --split val
 ```
+
+### 模型对比测试
+
+使用 `compare_models.py` 可以在测试集上对比多个模型的性能：
+
+**基本用法：**
+```bash
+cd /home/apulis-dev/code/rt_detr
+conda run -n mu --no-capture-output python compare_models.py --device 0,1 --batch 2
+```
+
+**参数说明：**
+- `--device`: GPU 设备编号（如 `0`, `0,1` 或 `cpu`）
+- `--batch`: 批次大小（根据显存调整）
+- `--imgsz`: 输入图像尺寸（默认 1280）
+- `--output_dir`: 结果输出目录（默认 `compare_results`）
+
+**对比结果输出：**
+运行后将在 `compare_results/` 目录生成：
+- `comparison_results.json` - JSON 格式的详细结果
+- `comparison_table.csv` - CSV 格式的对比表格
+- `metrics_comparison.png/pdf` - 指标对比柱状图
+- `radar_chart.png/pdf` - 性能雷达图
+- `eval_time_comparison.png/pdf` - 评估时间对比图
+- `complete_comparison.png/pdf` - 完整性能对比图
+- `comparison_analysis.md` - 详细分析报告
 
 ### 推理
 
